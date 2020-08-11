@@ -5,6 +5,7 @@
 #include "opencv2/imgproc/imgproc_c.h"
 #include <time.h>
 #include <iostream>
+#include <fstream>
 #include <math.h>
 #include <map>
 #include <vector>
@@ -17,6 +18,10 @@
 #include <chrono>
 #include <opencv2/xfeatures2d/nonfree.hpp>
 #include <opencv2/aruco.hpp>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <iomanip>
+#include <iterator>
 
 using namespace std;
 using namespace cv;
@@ -135,6 +140,7 @@ void SaveBinary(const std::string &filename, const cv::Mat &A, const std::vector
     std::ofstream ofs(filename, std::ios::binary);
     writeMatBinary(ofs, A);
     writeKeyPointsBinary(ofs, B);
+	ofs.close();
 }
 
 
@@ -142,20 +148,45 @@ void LoadBinary(const std::string &filename, cv::Mat &A, std::vector <cv::KeyPoi
     std::ifstream ifs(filename, std::ios::binary);
     readMatBinary(ifs, A);
     readKeyPointsBinary(ifs, B);
+	ifs.close();
 }
 
+void dirExists(const std::string &dirname, const std::string &testname) {	
+	struct stat dir_info;
+	if( stat( dirname.c_str(), &dir_info ) != 0 ) {
+	    cout << "Error: Cannot access " << testname << " directory " << dirname << endl;
+		throw "";
+	} else if(! ( dir_info.st_mode & S_IFDIR ) ) {
+		cout << "Error: " << dirname << " is not a directory!" << endl;
+		throw "";
+	}
+}
+
+void fileExists(const std::string &filename, const std::string &testname) {	
+	struct stat file_info;
+	if( stat( filename.c_str(), &file_info ) != 0 ) {
+	    cout << "Error: Cannot access " << testname << " file " << filename << endl;
+		throw "";
+	} else if(! ( file_info.st_mode & S_IFREG ) ) {
+		cout << "Error: " << filename << " is not a file!" << endl;
+		throw "";
+	}
+}
 
 int main(int argc, char *argv[])
 {
     int X_1, Y_1, X_2, Y_2, width, height, numKeyPts;
     int enroll=0;
-    string file;
-    string dbDir="./"; //For enrollment, it should be the directory to save Bin data of keypoints. 
+    string imgFile;
+    string dbDir="./DB"; //For enrollment, it should be the directory to save Bin data of keypoints. 
+    string RptDir="./RPT"; 
+    string figDir="./FIG"; 
     string EnrollmentRecord;//For verificationit, it should be the file that has been saved from enrollment. 
-    int debugSwitch=0; //if print images,it should be 1. else it is 0;
+    int saveFigs=0; //if print images,it should be 1. else it is 0;
     float WindowScale=1; //the scaling factor to control the ROI window size. If we want to use normal size, it should be 1;
-    int UseMarker=1; //
-    int LogDataToFile=0; //output to a file: 1) running time 2) feature distance  3) pixel distance 4) keypoints size in micrometers for enrollment
+    int UseMarker=0; //
+    int Rpt=0; //output to a file: 1) running time 2) feature distance  3) pixel distance 4) keypoints size in micrometers for enrollment
+	int RptHeader=0; //Flag to write header information to CSV reports
     int MidPt_input_X=1; // if No-marker is chosen, then this argument should be the X coordinator of ROI center. 
     int MidPt_input_Y=1; // if No-marker is chosen, then this argument should be the Y coordinator of ROI center. 
     int ROI_Size=0; //if No-marker is chosen, then this argument should be length of an enrollment ROI side. 
@@ -164,19 +195,23 @@ int main(int argc, char *argv[])
     { 
         string s = string(argv[i]);
         if (s == "--Image")
-            file = string(argv[++i]);
+            imgFile = string(argv[++i]);
         else if ( s == "--Enroll")        enroll = 1;
         else if ( s == "--Verify")        enroll = 0;   
-        else if ( s == "--DebugSwitch")   debugSwitch = 1; 
-        else if ( s == "--UseMarker")     UseMarker = 1;
-        else if ( s == "--NotUseMarker")  UseMarker = 0;  
-        else if ( s == "--LogDataToFile") LogDataToFile = 1;
+        else if ( s == "--Marker")     UseMarker = 1;
+        else if ( s == "--RptHeader") RptHeader = 1;
+        else if ( s == "--RptDir") {
+			Rpt = 1;
+            RptDir  = string(argv[++i]);
+		}
+        else if ( s == "--FigDir") {
+			saveFigs = 1;
+            figDir  = string(argv[++i]);
+		}
         else if ( s == "--DbDir")
             dbDir  = string(argv[++i]);
         else if ( s == "--EnrollmentRecord")
             EnrollmentRecord = string(argv[++i]);
-        else if ( s == "--WindowScale")
-            WindowScale = atof(argv[++i]); 
         else if ( s == "--MidPtX")
             MidPt_input_X=atoi(argv[++i]);  
         else if ( s == "--MidPtY")
@@ -191,20 +226,49 @@ int main(int argc, char *argv[])
             return 0;
         }
     }
-    
+	string testname = "DB";
+	if(enroll) 
+		dirExists(dbDir,testname);
+
+	testname = "RPT";
+	if(Rpt) 
+		dirExists(RptDir,testname);
+	testname = "FIG";
+	if(saveFigs) 
+		dirExists(figDir,testname);
+
+	testname = "IMG";
+	fileExists(imgFile,testname);
+	testname = "BIN";
+	if(!enroll) {
+		fileExists(EnrollmentRecord, testname);
+	}
+
     steady_clock::time_point startProgram = steady_clock::now();
     double keyPtDensity = 200.0 / (2 * 100 * 100);    // 100 keypts per 100x100 pixel area
-    ofstream PhysicalDistance("PhysicalDistance.txt", ios::app);
-    ofstream KeyPointSize("KeyPointSize.txt", ios::app);
-    ofstream FeatureDistance("featureDistance.txt", ios::app);
-    ofstream RunningTime("RunningTime.txt", ios::app);
-    string case_input = basename(file);
-    case_input = removeExtension(case_input);
-    int posStart = case_input.find_first_of("0123456789");
-    int posEnd = case_input.find_first_of("_");
-    string chipName = case_input.substr(posStart, posEnd - posStart);
-    int chipNum = stoi(chipName);
-    Mat bgr_image = imread(file);
+
+ 	ofstream PhysicalDistance;
+ 	ofstream KeyPointSize;
+ 	ofstream FeatureDistance;
+ 	ofstream Runtime_verify;
+ 	ofstream Runtime_enroll;
+ 	ofstream ScoringRpt;
+    if (Rpt)
+    {
+		if(enroll) {
+	    	KeyPointSize.open(RptDir + "/KeyPointSize.csv", ios::app);
+    		Runtime_enroll.open(RptDir + "/Runtime_enroll.csv", ios::app);
+		} else {
+	    	PhysicalDistance.open(RptDir + "/PhysicalDistance.csv", ios::app);
+    		FeatureDistance.open(RptDir + "/featureDistance.csv", ios::app);
+    		Runtime_verify.open(RptDir + "/Runtime_verify.csv", ios::app);
+    		ScoringRpt.open(RptDir + "/Scoring.csv", ios::app);
+		}
+	}
+    string img_name = basename(imgFile);
+    img_name = removeExtension(img_name);
+
+    Mat bgr_image = imread(imgFile);
     steady_clock::time_point start_readMarkerDictionary = steady_clock::now(); // start timer
 
     if (UseMarker)
@@ -227,9 +291,8 @@ int main(int argc, char *argv[])
         int resizeY_img = 1.0 * bgr_image.rows / scaleDown;
         resize(bgr_image, image_resized, Size(resizeX_img, resizeY_img));
         aruco::detectMarkers(image_resized, dictionary, markerCorners, markerIds, parameters, rejectedCandidates);
-        if (debugSwitch)
+        if (saveFigs)
         {
-            cout << "Image Markers = " << markerIds.size() << " Rejected = " << rejectedCandidates.size() << endl;
             if (markerIds.size() == 1)
                 aruco::drawDetectedMarkers(image_resized, markerCorners, markerIds);
             else
@@ -237,19 +300,11 @@ int main(int argc, char *argv[])
                 std::vector<int> emptyArray;
                 aruco::drawDetectedMarkers(image_resized, rejectedCandidates, emptyArray, Scalar(0, 0, 255));
             }
-            namedWindow("Marker_img", WINDOW_AUTOSIZE);
-            imshow("Marker_img", image_resized);
-            waitKey(0);
+            imwrite(figDir + "/markerDetection.png", image_resized);
         }
         if (markerIds.size() != 1)
         {
-            cout << case_input << " No marker found in Image !" << endl;
-            throw "";
-        }
-        if (markerIds[0] != chipNum)
-        {
-            cout << "Marker number " << markerIds[0] << " does not match with chipNum " << chipNum
-                 << " from filename " << case_input << endl;
+            cout << img_name << " No marker found in Image !" << endl;
             throw "";
         }
         double angleOffset = -PI / 8;
@@ -280,19 +335,15 @@ int main(int argc, char *argv[])
         Y_1 = midY - 0.5 * height;
         X_2 = midX + 0.5 * width;
         Y_2 = midY + 0.5 * height;
-        if (debugSwitch)
+        if (saveFigs)
         {
-            printf("theta = %f angle = %f rad = %f width = %d height = %d numKeyPt = %d\n", theta, angle, rad, width, height, numKeyPts);
             Point pt1(X_1, Y_1);
             Point pt2(X_2, Y_2);
-            rectangle(bgr_image, pt1, pt2, Scalar(255, 0, 0), 2);
+            rectangle(bgr_image, pt1, pt2, Scalar(255, 0, 0), 5);
             Point mkr1(mkr_x1, mkr_y1);
             Point mkr2(mkr_x3, mkr_y3);
-            rectangle(bgr_image, mkr1, mkr2, Scalar(0, 255, 0), 2);
-            namedWindow("Roi_img", WINDOW_NORMAL);
-            resizeWindow("Roi_img", 500, 500);
-            imshow("Roi_img", bgr_image);
-            waitKey(0);
+            rectangle(bgr_image, mkr1, mkr2, Scalar(0, 255, 0), 5);
+            imwrite(figDir + "/ROI_detection.png", bgr_image);
         }
     }    
     else
@@ -315,16 +366,12 @@ int main(int argc, char *argv[])
         Y_1 = midY - 0.5 * height;
         X_2 = midX + 0.5 * width;
         Y_2 = midY + 0.5 * height;
-        if (debugSwitch)
+        if (saveFigs)
         {
-            printf("width = %d height = %d numKeyPts = %d\n", width, height, numKeyPts);
             Point pt1(X_1, Y_1);
             Point pt2(X_2, Y_2);
-            rectangle(bgr_image, pt1, pt2, Scalar(255, 0, 0), 2);
-            namedWindow("Roi_img", WINDOW_NORMAL);
-            resizeWindow("Roi_img", 500, 500);
-            imshow("Roi_img", bgr_image);
-            waitKey(0);
+            rectangle(bgr_image, pt1, pt2, Scalar(255, 0, 0), 5);
+            imwrite(figDir + "/ROI_detection.png", bgr_image);
         }
     }
 
@@ -358,6 +405,8 @@ int main(int argc, char *argv[])
     Ptr <ORB> orb;
     if (FeatureDetector == "sift")
         f2d = xfeatures2d::SIFT::create(numKeyPts);
+		// For OpenCV 4 use following syntax as location of SIFT has moved
+        //f2d = cv::SIFT::create(numKeyPts);
     else if (FeatureDetector == "surf")
         f2d = xfeatures2d::SURF::create(30);
     else if (FeatureDetector == "orb")
@@ -381,26 +430,61 @@ int main(int argc, char *argv[])
             orb->detectAndCompute(gray, Mat(), kpA_orig, desA_orig);
         else if (FeatureDetector == "brisk")
             brisk->detectAndCompute(gray, Mat(), kpA_orig, desA_orig);
-            
-        if (LogDataToFile)
+
+        //show keypoints in the image
+        if (saveFigs)
         {
+            Mat enrollImg_allKeyPts;
+            drawKeypoints(gray, kpA_orig, enrollImg_allKeyPts, Scalar::all(-1), DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+            imwrite(figDir + "/Enrollment_KeyPts.png", enrollImg_allKeyPts);
+        }
+            
+        if (Rpt)
+        {
+			KeyPointSize << img_name << ",";
             for (int i = 0; i < kpA_orig.size(); i++)
             {
-                KeyPointSize << (kpA_orig[i].size) / width << endl;
+                KeyPointSize << (kpA_orig[i].size) / width << ",";
             }
+			KeyPointSize << endl;
             KeyPointSize.close();
         }
-        SaveBinary(dbDir + "/" + case_input + ".bin", desA_orig, kpA_orig); 
+        SaveBinary(dbDir + "/" + img_name + ".bin", desA_orig, kpA_orig); 
         
         steady_clock::time_point end_Feature_Detection = steady_clock::now();
-        cout << "Marker_size = " << width << endl;
-        cout << "Runtime: ";
-        cout << "Total="<< (duration_cast<microseconds>(end_Feature_Detection - startProgram).count()) /1000000.0<< " ";
-        cout << "readImage="<< (duration_cast<microseconds>(start_readMarkerDictionary - startProgram).count()) /1000000.0 << " ";
-        cout << "MarkerROI="<< (duration_cast<microseconds>(start_CLAHE - start_readMarkerDictionary).count()) /1000000.0 << " ";
-        cout << "Clahe="<< (duration_cast<microseconds>(start_Feature_Detection - start_CLAHE).count()) /1000000.0<< " ";
-        cout << "Feature Detection="<< (duration_cast<microseconds>(end_Feature_Detection - start_Feature_Detection).count()) /1000000.0 << " ";
-        cout << endl;
+		double tEnroll_readImage = (duration_cast<microseconds>(start_readMarkerDictionary - startProgram).count()) /1000;
+		double tEnroll_ROI = (duration_cast<microseconds>(start_CLAHE - start_readMarkerDictionary).count()) /1000;
+		double tEnroll_CLAHE = (duration_cast<microseconds>(start_Feature_Detection - start_CLAHE).count()) /1000;
+		double tEnroll_featureDetection = (duration_cast<microseconds>(end_Feature_Detection - start_Feature_Detection).count()) /1000;
+		double tEnroll_total = (duration_cast<microseconds>(end_Feature_Detection - startProgram).count()) /1000;
+		cout << "----------------------------------------------" << endl;
+        cout << "-- Runtime Summary for Enrollment Process" << endl;
+		cout << "----------------------------------------------" << endl;
+		cout << setw(20) << left << "Operation" << "Runtime(ms)" << endl;
+		cout << "----------------------------------------------" << endl;
+        cout << setw(20) << left << "Read Image";
+		cout << setw(5) << right << tEnroll_readImage << endl;
+        cout << setw(20) << left << "ROI identification"; 
+		cout << setw(5) << right << tEnroll_ROI << endl;
+        cout << setw(20) << left << "Preprocessing";
+		cout << setw(5) << right  << tEnroll_CLAHE << endl;
+        cout << setw(20) << left << "Feature Detection";
+		cout << setw(5) << right  << tEnroll_featureDetection << endl;
+		cout << setw(20) << left << endl;
+        cout << setw(20) << left << "Total";
+		cout << setw(5) << right << tEnroll_total << endl;
+		cout << "----------------------------------------------" << endl;
+		if(Rpt) {
+			if(RptHeader) 
+				Runtime_enroll << "Enrolled_image,Read_image,ROI_identification,Preprocessing,Feature_Detection,Total" << endl;
+			Runtime_enroll << img_name << ",";
+			Runtime_enroll << tEnroll_readImage << ",";
+			Runtime_enroll << tEnroll_ROI << ",";
+			Runtime_enroll << tEnroll_CLAHE << ",";
+			Runtime_enroll << tEnroll_featureDetection << ",";
+			Runtime_enroll << tEnroll_total << endl;
+            Runtime_enroll.close();
+		}
         return 0;
     }
 
@@ -426,13 +510,12 @@ int main(int argc, char *argv[])
         steady_clock::time_point end_Feature_Detection = steady_clock::now();
     
         //show keypoints in the image
-        if (debugSwitch)
+        if (saveFigs)
         {
-            Mat imgA_allKeyPts, imgB_allKeyPts;
-            drawKeypoints(gray, kpA, imgA_allKeyPts);
-            namedWindow("siftKeyPts_imgA", WINDOW_AUTOSIZE);
-            imshow("siftKeyPts_imgA", imgA_allKeyPts);
-            waitKey(0);
+            Mat verifyImg_allKeyPts;
+            drawKeypoints(gray, kpB, verifyImg_allKeyPts, Scalar::all(-1), DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+
+            imwrite(figDir + "/Verification_KeyPts.png", verifyImg_allKeyPts);
         }
      
         // KNN matching of enrollment and verification keypoints using appropriate matcher 
@@ -452,6 +535,11 @@ int main(int argc, char *argv[])
         float ratio;
         map<int, float> matchRatio;
         int sortedMatches[knn_matches.size()];
+        if (Rpt) {
+			if(RptHeader)
+				FeatureDistance << "Enrollment_record,Verification_image,Nearest_neighbor,Second_nearest_neighbor,Ratio" << endl;
+			FeatureDistance << EnrollmentRecord << "," << img_name << ",";
+		}
         for (size_t i = 0; i < knn_matches.size(); i++)
         {
             //If no neighbor is found, then continue the next matching pairs.
@@ -464,13 +552,12 @@ int main(int argc, char *argv[])
             ratio = (knn_matches[i][0].distance / knn_matches[i][1].distance);
             matchRatio[i] = ratio;
         
-            if (LogDataToFile)
-            {
-                FeatureDistance << knn_matches[i][0].distance << " " << knn_matches[i][1].distance << " " << ratio << endl;
-            }
+            if (Rpt)
+                FeatureDistance << knn_matches[i][0].distance << "," << knn_matches[i][1].distance << "," << ratio << ";";
         }
-        if (LogDataToFile)
+        if (Rpt)
         {
+			FeatureDistance << endl;
             FeatureDistance.close();
         }
         vector <pair<int, float>> vect(matchRatio.begin(), matchRatio.end());
@@ -526,9 +613,12 @@ int main(int argc, char *argv[])
         vector <Point2f> srcPt;
         vector <Point2f> src_transformed;
         vector <Point2f> dstPt;
+		vector<DMatch> inliers_final;
         map<int, int> inlierIndices;
         map<int, int>::iterator it2;
         DMatch matchingInlier;
+        if (Rpt) 
+			PhysicalDistance << EnrollmentRecord << "," << img_name << ",";
 
         for (int i = 0; i < knn_matches.size(); i++) {
             matchingInlier = knn_matches[i][0];
@@ -546,8 +636,8 @@ int main(int argc, char *argv[])
             dstPt.clear();
             dstPt.push_back(kpB[matchingInlier.trainIdx].pt);
             float distVal = pow(dstPt[0].x - src_transformed[0].x, 2) + pow(dstPt[0].y - src_transformed[0].y, 2);
-            if (LogDataToFile)
-                PhysicalDistance << distVal << endl; 
+            if (Rpt)
+                PhysicalDistance << distVal << ","; 
 
             //check duplicates and the distance. If no duplicates are
             //found and the pixel distance is within threshold then
@@ -559,39 +649,105 @@ int main(int argc, char *argv[])
                     inlierIndices[matchingInlier.trainIdx] = 1;
                 else
                     inlierIndices[matchingInlier.trainIdx] += 1;
-                if (inlierIndices[matchingInlier.trainIdx] <= MAX_DUPLICATES)
+                if (inlierIndices[matchingInlier.trainIdx] <= MAX_DUPLICATES) {
+					if(saveFigs)
+						inliers_final.push_back(matchingInlier);
                     numInliers += 1;
+				}
             }
         }
+        if (saveFigs)
+        {
+        	vector<char> inliersMask(numInliers,1);
+            Mat img_inliers;
+
+			double max_X = 0.0;
+			double max_Y = 0.0;
+        	for (int i = 0; i < kpA.size(); i++) {
+				double x_pt = kpA[i].pt.x;	
+				double y_pt = kpA[i].pt.y;	
+				if(x_pt > max_X)
+					max_X = x_pt;
+				if(y_pt > max_Y)
+					max_Y = y_pt;
+			}
+			int blankRows = 1.1 * max_Y;
+			int blankCols = 1.1 * max_X;	
+			Mat blankA(blankCols,blankRows,CV_8UC1,Scalar(255,255,255));
+
+            drawMatches(blankA, kpA, gray, kpB, inliers_final, img_inliers, Scalar::all(-1), Scalar::all(-1), inliersMask, DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+
+            imwrite(figDir + "/" + "Inliers.png", img_inliers);
+        }
+
+        if (Rpt) {
+            PhysicalDistance << endl; 
+            PhysicalDistance.close();
+		}
 
         //printout the running time
         steady_clock::time_point endProgram = steady_clock::now();
-        cout << EnrollmentRecord << " " << case_input << " ";
-        printf("KeyPoint in enrollment = %d, KeyPoint in verification = %d, Inliers = %d \n", kpA.size(), kpB.size(), numInliers);
-        cout << "Runtime: ";
-        cout << "Total=" << (duration_cast<microseconds>(endProgram - startProgram).count()) /1000000.0<< " ";
-        cout << "readImage="<< (duration_cast<microseconds>(start_readMarkerDictionary - startProgram).count()) /1000000.0<< " ";
-        cout << "MarkerROI="<< (duration_cast<microseconds>(start_CLAHE - start_readMarkerDictionary).count()) /1000000.0<< " ";
-        cout << "Clahe="<< (duration_cast<microseconds>(start_Feature_Detection - start_CLAHE).count()) /1000000.0<< " ";
-        cout << "Feature Detection="<< (duration_cast<microseconds>(end_Feature_Detection - start_Feature_Detection).count()) /1000000.0 << " ";
-        cout << "Match="<< (duration_cast<microseconds>(endMatch - end_Feature_Detection).count()) /1000000.0 << " ";
-        cout << "rankMatches=" << (duration_cast<microseconds>(startHomo - endMatch).count()) /1000000.0 << " ";
-        cout << "Homography=" << (duration_cast<microseconds>(endHomo - startHomo).count()) /1000000.0 << " ";
-        cout << "Projection=" << (duration_cast<microseconds>(endProgram - endHomo).count()) /1000000.0 << endl;
+		double tVerify_readImage = (duration_cast<microseconds>(start_readMarkerDictionary - startProgram).count()) /1000;
+		double tVerify_ROI = (duration_cast<microseconds>(start_CLAHE - start_readMarkerDictionary).count()) /1000;
+		double tVerify_CLAHE = (duration_cast<microseconds>(start_Feature_Detection - start_CLAHE).count()) /1000;
+		double tVerify_featureDetection = (duration_cast<microseconds>(end_Feature_Detection - start_Feature_Detection).count()) /1000;
+		double tVerify_Match = (duration_cast<microseconds>(endMatch - end_Feature_Detection).count()) /1000;
+		double tVerify_rankMatch = (duration_cast<microseconds>(startHomo - endMatch).count()) /1000;
+		double tVerify_Homography = (duration_cast<microseconds>(endHomo - startHomo).count()) /1000;
+		double tVerify_Proj_n_Score = (duration_cast<microseconds>(endProgram - endHomo).count()) /1000;
+		double tVerify_total = (duration_cast<microseconds>(endProgram - startProgram).count()) /1000;
+		cout << "----------------------------------------------" << endl;
+        cout << "-- Runtime Summary for Verification Process" << endl;
+		cout << "----------------------------------------------" << endl;
+		cout << setw(25) << left << "Operation" << "Runtime(ms)" << endl;
+		cout << "----------------------------------------------" << endl;
+        cout << setw(25) << left << "Read Image";
+		cout << setw(5) << right << tVerify_readImage << endl;
+        cout << setw(25) << left << "ROI identification"; 
+		cout << setw(5) << right << tVerify_ROI << endl;
+        cout << setw(25) << left << "Preprocessing";
+		cout << setw(5) << right  << tVerify_CLAHE << endl;
+        cout << setw(25) << left << "Feature Detection";
+		cout << setw(5) << right  << tVerify_featureDetection << endl;
+        cout << setw(25) << left << "Matching";
+		cout << setw(5) << right << tVerify_Match + tVerify_rankMatch << endl;
+        cout << setw(25) << left << "Homography";
+		cout << setw(5) << right << tVerify_Homography << endl;
+        cout << setw(25) << left << "Projection and Scoring";
+		cout << setw(5) << right << tVerify_Proj_n_Score << endl;
+        cout << setw(25) << left << "Total";
+		cout << setw(5) << right << tVerify_total << endl;
+		cout << "----------------------------------------------" << endl;
+        cout << "-- Scoring Summary for Verification Process" << endl;
+		cout << "----------------------------------------------" << endl;
+        cout << setw(25) << left << "Enrolled Keypoints";
+		cout << setw(5) << right << kpA.size() << endl;
+        cout << setw(25) << left << "Verification Keypoints"; 
+		cout << setw(5) << right << kpB.size() << endl;
+        cout << setw(25) << left << "Inliers";
+		cout << setw(5) << right  << numInliers << endl;
 
-        if (LogDataToFile)
-        {
-            PhysicalDistance.close();
 
-            RunningTime << "Total="<< (duration_cast<microseconds>(endProgram - startProgram).count()) /1000000.0 << " " << endl;
-            RunningTime << "readImage=" <<(duration_cast<microseconds>(start_readMarkerDictionary - startProgram).count()) /1000000.0 << " " << endl;
-            RunningTime << "MarkerROI=" << (duration_cast<microseconds>(start_CLAHE - start_readMarkerDictionary).count()) /1000000.0 << " " << endl;
-            RunningTime << "Clahe=" << (duration_cast<microseconds>(start_Feature_Detection - start_CLAHE).count()) /1000000.0 << " " << endl;
-            RunningTime << "Feature Detection=" << (duration_cast<microseconds>(end_Feature_Detection - start_Feature_Detection).count()) /1000000.0 << " " << endl;
-            RunningTime << "Match=" << (duration_cast<microseconds>(endMatch - end_Feature_Detection).count()) /1000000.0 << " " << endl;
-            RunningTime << "rankMatches="<< (duration_cast<microseconds>(startHomo - endMatch).count()) /1000000.0 << " "<< endl;
-            RunningTime << "Homography="<< (duration_cast<microseconds>(endHomo - startHomo).count()) /1000000.0 << " "<< endl;
-            RunningTime.close();
+		if(Rpt) {
+			if(RptHeader) { 
+				Runtime_verify << "Enrollment_record,Verification_image,Read_image,ROI_identification,Preprocessing,Feature_Detection,Matching,Homography,Projection_and_Scoring,Total" << endl;
+				ScoringRpt <<  "Enrollment_record,Verification_image,Enrolled_keypoints,Verification_keypoints,Inliers" << endl;
+			}
+			Runtime_verify << EnrollmentRecord << ",";
+			Runtime_verify << img_name << ",";
+			Runtime_verify << tVerify_readImage << ",";
+			Runtime_verify << tVerify_ROI << ",";
+			Runtime_verify << tVerify_CLAHE << ",";
+			Runtime_verify << tVerify_featureDetection << ",";
+			Runtime_verify << tVerify_Match + tVerify_rankMatch << ",";
+			Runtime_verify << tVerify_Homography << ",";
+			Runtime_verify << tVerify_Proj_n_Score << ",";
+			Runtime_verify << tVerify_total << endl;
+
+            Runtime_verify.close();
+
+			ScoringRpt << EnrollmentRecord << "," << img_name << "," << kpA.size() << "," << kpB.size() << "," << numInliers << endl;
+            ScoringRpt.close();
         }
         return 0;
     }

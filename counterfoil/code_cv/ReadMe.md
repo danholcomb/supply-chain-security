@@ -1,129 +1,69 @@
-The program functions for both enrollment and verification of
-chips. Enrollment should be executed before verification. Users can
-switch the functions between enrollment and verification. Before using
-the program, OpenCv and OpenCv-contrib lib need to be installed. The
-markers can work for OpenCv-3.4.5.
-
-Functions for enrollment and verification are listed below:
-
-  Enrollment: the input file is a chip image. The output is a binary
-  file(.bin) which contains the information of keypoints and
-  descriptors. Marker size (if existing) and running time of different
-  parts will also be printed.
-  
-  Verification: the input files are another chip image and one binary
-  file from enrollment. The program reads the information from the
-  binary file and tries to match it with the input chip image. At the
-  end of the program, it will output the number of inliers which
-  indicates the matching degree between the regions of the images for
-  enrollment and verification. Given a certain area, more inliers mean
-  more matching degrees. The numbers in the last second row from left
-  to right printed from the result are number of keypoints found in
-  image for enrollment, number of keypoints found in image for
-  verification and number of inliers respectively. Also, the running
-  time of different parts of verification will be printed out.
+counterfoil.cpp extracts fingerprints from images of chip packages
+as a means to verify chip provenance and thwart counterfeits. It uses
+OpenCV implementation of prominent Computer Vision algorithms for
+feature detection and matching. 
 
 
-Image database includes images without markers and the ones with
-markers. Functions include enrollment and verification. Users can
-switch the functions and image database by the input arguments. Input
-arguments are required as below:
+Requirements:
+ opencv-3.4.5 			https://github.com/opencv/opencv/releases/tag/3.4.5 
+ opencv-contrib-3.4.5	https://github.com/opencv/opencv_contrib/releases/tag/3.4.5
 
-
-argument '--Image':  
+Useful resources for installation and reference manuals:
+ https://docs.opencv.org/3.4.5/df/d65/tutorial_table_of_content_introduction.html
+ https://docs.opencv.org/3.4.5/index.html
 	
-  In enrollment this is the image to extract keypoints from and its
-  information will be stored in the binary file. In verification it is
-  the image that the program tries to match the enrollment record
-  against. Users need to add the image file after the text "--Image"
-  like "--Image ./chip.bmp"
-  
+The program runs in two modes: feature enrollment and verification. 
+Records of extracted fingerprints are created during enrollment, 
+which are then checked against in the verification phase.
 
-argument '--DbDir':  
-
-  In enrollment this sets the path where the binary file will be
-  exported to. The default path is current directory. Users can
-  customize the path by the format like "--DbDir /data/DB"
-
-argument '--EnrollmentRecord':  
-
-  In verficiation it is the existing binary file from the enrollment
-  record. Users need to add the name of the binary file after the text
-  "--EnrollmentRecord" like "--EnrollmentRecord ./chip.bin"
-  
-
-argument '--Enroll':  
-
-  Using this flag will execute an enrollment.  
-
-
-argument '--Verify':  
-
-  Using this flag will execute a verification.  
-  
+Enrollment mode:
 	
-argument '--DebugSwitch':  
-
-  using this flag will display intermediate images which show region
-  of interest (ROI) and so on.
-  
-
-
-argument '--UseMarker' or '--NotUseMarker' :
-
-  This flag causes ROI to be defined according to ARUCO marker. If the
-  input is "--UseMarker", then ROI in images will be located by the
-  marker automatically. If the input is "--NotUseMarker", The
-  arguments ‘--MidPtX’, ‘--MidPtY’, ‘--ROISize’ should be defined to
-  determine the ROI.
-  	
-argument ‘--LogDataToFile’:  
-
-  This flag causes logging of several data like running time, feature
-  distance for nearest neighbor, second nearest neighbor and their
-  ratio, physical distances between the nearest matching point and the
-  point calculated by Homography, keypoint size of enrollment will be
-  written to the files.
-
-
-argument ‘--WindowScale’:  
-
-  When using markers, this argument is the coefficient to determine
-  the ROI. When it is 1, ROI is the normal size determined by the
-  marker. Otherwise the ROI will be this coefficient* original
-  ROI. The default value is 1. If users want to customize the size,
-  the input format should be like "--WindowScale 0.9".
-    
-  		
-argument ‘--MidPtX’:  
-
-  Integer that defines the x-coordinate of ROI if markers are not
-  being used to define ROI. The input format should be like "--MidPtX 500".
-  
-  
-argument ‘--MidPtY’:  
-
-  Integer that defines the y-coordinate of ROI if markers are not
-  being used to define ROI. The input format should be like "--MidPtY 500".
-  
-  
-argument ‘--ROISize’:  
-
-  Defines the enrollment ROI area in terms of pixel when markers are not used to define
-  ROI. The input format should be like "--ROISize 600". 
-  
-  
-argument ‘--FeatureDetector’:  
-
-  This argument can be set as either ‘sift’, ‘orb’, ‘surf’, ‘brisk’ as
-  the feature detector. The input format should be like "--FeatureDetector orb".
-
-Example input:  
-
-	Enrollment for images with markers  
+	./counterfoil --Enroll --Marker --Image ./chip1.bmp --FeatureDetector orb --DbDir ./DB 
 	
-	./EXECUTABLE_FILE --Enroll --UseMarker --Image ./chip1.bmp --FeatureDetector orb --DbDir ./
+	The program takes in as input a chip image whose fingerprint we wish to enroll.
+	It uses specified feature detection algorithm (one of ORB, SIFT, SURF, BRISK)
+	to extract features and store keypoint descriptor information in a database as a
+	binary file (.bin). In the typical setting Aruco markers are used to select a 
+	Region-Of-Interest (ROI) on the package surface for enrollment. The program also
+	supports a user specified ROI.
+
+	./counterfoil --Enroll --ROISize 500 --MidPtX 125 --MidPtY 200 --Image ./chip1.bmp --FeatureDetector orb --DbDir ./DB 
+
+Verification mode:
+
+	./counterfoil --Verify --Marker --Image ./chip2.bmp --EnrollmentRecord ./DB/chip1.bin --FeatureDetector orb
+
+	For verification of chip provenance, the verifier compares the image of chip at hand
+	with enrolled record. Similar syntax is used to invoke the program in verification mode.
+	The enrollment record is an additional required input.
+
+Outputs:
+
+	./counterfoil --Verify --Marker --Image ./chip1.bmp --FeatureDetector orb --DbDir ./DB --RptDir ./RPT --RptHeader --FigDir ./FIG 
 	
-	Verification for images with markers
-	
-	./EXECUTABLE_FILE --Verify --UseMarker --Image ./chip1.bmp --EnrollmentRecord ./chip1.bin --FeatureDetector orb
+	In addition to displaying runtime and scoring reports on STDOUT, the program can also 
+	log additional information such as keypoint size, feature distance to CSV files.
+	Further, images of feature detection and matching are generated for visual understanding.
+
+Examples:
+
+./counterfoil --Enroll --Marker --Image ~/supply-chain-security/counterfoil/images/MainDataset/Vitiny/23LC1024/chip00_v2_D36_trial1.bmp --FeatureDetector orb --DbDir TEST --RptDir TEST --FigDir TEST
+./counterfoil --Verify --Marker --Image ~/supply-chain-security/counterfoil/images/MainDataset/Vitiny/23LC1024/chip00_v1_D36_trial2.bmp --FeatureDetector orb --DbDir TEST --RptDir TEST --FigDir TEST --EnrollmentRecord TEST/chip00_v2_D36_trial1.bin
+
+./counterfoil --Enroll --ROISize 500 --MidPtX 1500 --MidPtY 1500 --Image ~/supply-chain-security/counterfoil/images/MainDataset/Vitiny/23LC1024/chip00_v2_D36_trial1.bmp --FeatureDetector orb --DbDir TEST --RptDir TEST --FigDir TEST
+./counterfoil --Verify --ROISize 500 --MidPtX 1500 --MidPtY 1500 --Image ~/supply-chain-security/counterfoil/images/MainDataset/Vitiny/23LC1024/chip00_v1_D36_trial2.bmp --FeatureDetector orb --DbDir TEST --RptDir TEST --FigDir TEST --EnrollmentRecord TEST/chip00_v2_D36_trial1.bin
+
+|                  Option                 	|    Type   	|                                                                       Enrollment Mode                                                                      	|                                                                      Verification Mode                                                                     	|
+|:---------------------------------------:	|:---------:	|:----------------------------------------------------------------------------------------------------------------------------------------------------------:	|:----------------------------------------------------------------------------------------------------------------------------------------------------------:	|
+| --Enroll                                	| Required  	| Run script in enrollment mode.<br>Cannot specify along with --Verify                                                                                       	| N/A                                                                                                                                                        	|
+| --Verify                                	| Required  	| N/A                                                                                                                                                        	| Run script in verification mode.<br>Cannot specify along with --Enroll                                                                                     	|
+| --Image chip.bmp                        	| Required  	| Image used for feature enrollment                                                                                                                          	| Image used for feature verification.<br>Features matched against enrolled record.                                                                          	|
+| --DbDir /data/DB                        	| Required  	| Directory where enrollment record (.bin) is written                                                                                                        	| N/A                                                                                                                                                        	|
+| --FeatureDetector orb                   	| Required  	| Algorithm used for feature detection and extraction.<br>Supported algorithms are orb, sift, surf, brisk                                                    	| Algorithm used for feature detection and extraction.<br>Supported algorithms are orb, sift, surf, brisk                                                    	|
+| --EnrollmentRecord chip.bin             	| Required  	| N/A                                                                                                                                                        	| Binary file with enrolled keypoint descriptors that is <br>used for matching against verification image.                                                   	|
+| --Marker                                	| Optional  	| Automatically detect ROI using Aruco marker.<br>If this option is not used, user must manually specify<br>ROI using --ROISize, --MidPtX, --MidPtY options. 	| Automatically detect ROI using Aruco marker.<br>If this option is not used, user must manually specify<br>ROI using --ROISize, --MidPtX, --MidPtY options. 	|
+| --ROISize N<br>--MidPtX x<br>--MidPtY y 	| Optional  	| Selects a square ROI with side of N pixels. <br>Midpoint of ROI is (x,y)<br>Must specify these options if --Marker is not used.                            	| Selects a square ROI with side of N pixels. <br>Midpoint of ROI is (x,y)<br>Must specify these options if --Marker is not used.                            	|
+| --RptDir /data/RPT<br>--RptHeader       	| Optional  	| If specified output CSV reports are written to directory.<br>Header information printed if --RptHeader is used.                                            	| If specified output CSV reports are written to directory.<br>Header information printed if --RptHeader is used.                                            	|
+| --FigDir /data/FIG                      	| Optional  	| If specified images (.png) showing feature detection<br>and matching written to directory                                                                  	| If specified images (.png) showing feature detection<br>and matching written to directory                                                                  	|
+
+
