@@ -3,7 +3,9 @@ DigitalSignature.cpp uses DSA algorithm to sign package fingerprints during enro
 and verify signature during the verification phase of counterfoil. The program uses Crypto++ library (v8.2.0)
 for implementation of DSA.
 
+-------------------
 SETUP
+-------------------
   1. Download Crypto++ from Git ( https://github.com/weidai11/cryptopp )
   2. Copy DigitalSignature.cpp to cryptopp/
   3. Edit GNUmake file to compile DigitalSignature.cpp rather than the default test.cpp
