@@ -16,11 +16,9 @@ SETUP
 | ./cryptest.exe --Command sign --File chip.bin --PrivKey dsaprivate.dat                             	| Sign counterfoil enrollment record (.bin)<br>using DSA private key. <br>SHA3-256 used for hashing. 	| signature.txt                 	|
 | ./cryptest.exe --Command verify --File chip.bin --PubKey dsapublic.dat --Signature ./signature.txt 	| Verify signature using DSA public key. <br>SHA3-256 used for hashing                               	|                               	|
 
-
-======================================================
-=== LICENSE
-======================================================
-
+-------------------
+LICENSE
+-------------------
 The Crypto++ Library (as a compilation) is currently licensed under the Boost
 Software License 1.0 (http://www.boost.org/users/license.html).
 
