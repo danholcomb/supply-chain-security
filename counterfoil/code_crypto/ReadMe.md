@@ -1,49 +1,25 @@
-DigitalSignature.cpp can implement the DSA functions of both signing
-and verifing signature, and key generation. DigitalSignature.cpp is
-derived from a file that is provided with cryptopp. Before using the
-code, users need to download version 8.2.0 of cryptopp from
-https://github.com/weidai11/cryptopp and its related Cmake.  The
-default compiling file is the test.cpp. Users need to modify the
-related configuration files to compile this file.
 
-To generate key:
+DigitalSignature.cpp uses DSA algorithm to sign package fingerprints during enrollment phase of counterfoil, 
+and verify signature during the verification phase of counterfoil. The program uses Crypto++ library (v8.2.0)
+for implementation of DSA.
 
-  Private key will be saved in "dsaprivate.dat" while public key will
-  be saved in "dsapublic.dat".
+SETUP
+  1. Download Crypto++ from Git ( https://github.com/weidai11/cryptopp )
+  2. Copy DigitalSignature.cpp to cryptopp/
+  3. Edit GNUmake file to compile DigitalSignature.cpp rather than the default test.cpp
+  4. Run "make" to generate the executable cryptest.exe
 
-  The format to execute generating key is:
-   ./cryptest.exe --Command KeyGen  
-   
-To sign signature:  
 
-   Reading data, hashing data, reading private key and signing will be
-   executed. Private key will be read from a file assigned from input
-   argument and signature will be written to "signature.txt". Running
-   time of different parts will be printed out.
-   
-   The format to execute signing signature is:
-   ./cryptest.exe --Command sign --File chip.bin --PrivKey dsaprivate.dat     
-   
-To verify signature:  
-
-  Reading data, hashing data, reading public key, reading signature
-  and signature verification will be executed. Signature will be read
-  and public key will be read from the files assigned from input
-  arguments. Running time of different parts will be printed out.
-  
-  The format to execute verifying signature is:
-  ./cryptest.exe --Command verify --File chip.bin --PubKey dsapublic.dat --Signature ./signature.txt 
-
-  Text output will indicate either "Verified signature on message" or
-  else "Failed to verify signature on message"..
-
+|                                               Command                                              	|                                              Operation                                             	|             Output            	|
+|:--------------------------------------------------------------------------------------------------:	|:--------------------------------------------------------------------------------------------------:	|:-----------------------------:	|
+| ./cryptest.exe --Command KeyGen                                                                    	| Generate DSA private and public keys                                                               	| dsaprivate.dat, dsapublic.dat 	|
+| ./cryptest.exe --Command sign --File chip.bin --PrivKey dsaprivate.dat                             	| Sign counterfoil enrollment record (.bin)<br>using DSA private key. <br>SHA3-256 used for hashing. 	| signature.txt                 	|
+| ./cryptest.exe --Command verify --File chip.bin --PubKey dsapublic.dat --Signature ./signature.txt 	| Verify signature using DSA public key. <br>SHA3-256 used for hashing                               	|                               	|
 
 
 ======================================================
-
-As noted above, our code is derived from test.cpp of cryptopp. Its
-license is reproduced below.
-
+=== LICENSE
+======================================================
 
 The Crypto++ Library (as a compilation) is currently licensed under the Boost
 Software License 1.0 (http://www.boost.org/users/license.html).

@@ -47,11 +47,19 @@ Outputs:
 
 Examples:
 
-./counterfoil --Enroll --Marker --Image ~/supply-chain-security/counterfoil/images/MainDataset/Vitiny/23LC1024/chip00_v2_D36_trial1.bmp --FeatureDetector orb --DbDir TEST --RptDir TEST --FigDir TEST
-./counterfoil --Verify --Marker --Image ~/supply-chain-security/counterfoil/images/MainDataset/Vitiny/23LC1024/chip00_v1_D36_trial2.bmp --FeatureDetector orb --DbDir TEST --RptDir TEST --FigDir TEST --EnrollmentRecord TEST/chip00_v2_D36_trial1.bin
+./counterfoil --Enroll --Marker --Image ~/supply-chain-security/counterfoil/images/MainDataset/Vitiny/23LC1024/chip00_v2_D36_trial1.bmp \
+              --FeatureDetector orb --DbDir TEST --RptDir TEST --FigDir TEST
 
-./counterfoil --Enroll --ROISize 500 --MidPtX 1500 --MidPtY 1500 --Image ~/supply-chain-security/counterfoil/images/MainDataset/Vitiny/23LC1024/chip00_v2_D36_trial1.bmp --FeatureDetector orb --DbDir TEST --RptDir TEST --FigDir TEST
-./counterfoil --Verify --ROISize 500 --MidPtX 1500 --MidPtY 1500 --Image ~/supply-chain-security/counterfoil/images/MainDataset/Vitiny/23LC1024/chip00_v1_D36_trial2.bmp --FeatureDetector orb --DbDir TEST --RptDir TEST --FigDir TEST --EnrollmentRecord TEST/chip00_v2_D36_trial1.bin
+./counterfoil --Verify --Marker --Image ~/supply-chain-security/counterfoil/images/MainDataset/Vitiny/23LC1024/chip00_v1_D36_trial2.bmp \
+              --FeatureDetector orb --DbDir TEST --RptDir TEST --FigDir TEST --EnrollmentRecord TEST/chip00_v2_D36_trial1.bin
+
+./counterfoil --Enroll --ROISize 500 --MidPtX 1500 --MidPtY 1500 \
+              --Image ~/supply-chain-security/counterfoil/images/MainDataset/Vitiny/23LC1024/chip00_v2_D36_trial1.bmp \
+              --FeatureDetector orb --DbDir TEST --RptDir TEST --FigDir TEST
+
+./counterfoil --Verify --ROISize 500 --MidPtX 1500 --MidPtY 1500 \
+              --Image ~/supply-chain-security/counterfoil/images/MainDataset/Vitiny/23LC1024/chip00_v1_D36_trial2.bmp \
+              --FeatureDetector orb --DbDir TEST --RptDir TEST --FigDir TEST --EnrollmentRecord TEST/chip00_v2_D36_trial1.bin
 
 |                  Option                 	|    Type   	|                                                                       Enrollment Mode                                                                      	|                                                                      Verification Mode                                                                     	|
 |:---------------------------------------:	|:---------:	|:----------------------------------------------------------------------------------------------------------------------------------------------------------:	|:----------------------------------------------------------------------------------------------------------------------------------------------------------:	|

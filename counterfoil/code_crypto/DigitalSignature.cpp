@@ -162,7 +162,7 @@ int scoped_main(int argc, char *argv[]) {
           }         
           else 
           {
-              std::cout<<" the input argument " <<s<< " is not recognized "<<std::endl;
+              std::cout<<"The input argument " <<s<< " is not recognized "<<std::endl;
               return 0;
           }
         } 
@@ -171,6 +171,14 @@ int scoped_main(int argc, char *argv[]) {
         if (argc < 2)
             command = ' ';
 
+		if ( (command=="KeyGen") || (command=="sign") || (command=="verify")) 
+		{
+			std::cout << "----------------------------------------------" << std::endl;
+			std::cout << "-- Runtime Summary " << std::endl;
+			std::cout << "----------------------------------------------" << std::endl;
+			std::cout << std::setw(28) << std::left << "Operation" << "Runtime(ms)" << std::endl;
+			std::cout << "----------------------------------------------" << std::endl;
+		}
         if (command=="KeyGen")
         {
             timeval t_startKeyGen, t_endKeyGen;   
@@ -184,10 +192,11 @@ int scoped_main(int argc, char *argv[]) {
                 std::cout << "DSA key generation failed";
             }
             gettimeofday(&t_endKeyGen, NULL);
-            printf("Key generation time: %ld microseconds\n",
-                   ((t_endKeyGen.tv_sec - t_startKeyGen.tv_sec) * 1000000L
-                    + t_endKeyGen.tv_usec) - t_startKeyGen.tv_usec
-            );
+
+            long timeKeyGen = ((t_endKeyGen.tv_sec - t_startKeyGen.tv_sec) * 1000.0) + (( t_endKeyGen.tv_usec - t_startKeyGen.tv_usec)/1000.0);
+	        std::cout << std::setw(28) << std::left << "DSA key generation";
+    	    std::cout << std::setw(5) << std::right << timeKeyGen << std::endl;
+
             FileSink output_1("dsapublic.dat");
             PublicKey.DEREncode(output_1);
             FileSink output_2("dsaprivate.dat");
@@ -205,8 +214,10 @@ int scoped_main(int argc, char *argv[]) {
                                                        std::istreambuf_iterator<char>());
             std::string msg(data.begin(), data.end());
             gettimeofday(&t_endReading, NULL);
-            printf("Reading time: %ld microseconds\n",
-                   ((t_endReading.tv_sec - t_start.tv_sec) * 1000000L + t_endReading.tv_usec) - t_start.tv_usec);
+            
+            long timeSign_readData = ((t_endReading.tv_sec - t_start.tv_sec) * 1000.0) + ((t_endReading.tv_usec - t_start.tv_usec)/1000.0) ;
+	        std::cout << std::setw(28) << std::left << "Read fingerprint (sign)";
+    	    std::cout << std::setw(5) << std::right << timeSign_readData << std::endl;
             
             //hash data
             std::string digest;
@@ -216,10 +227,9 @@ int scoped_main(int argc, char *argv[]) {
             hash.Final((byte * ) & digest[0]);
             
             gettimeofday(&t_endHash, NULL);
-            printf("Hash time: %ld microseconds\n",
-                   ((t_endHash.tv_sec - t_endReading.tv_sec) * 1000000L
-                    + t_endHash.tv_usec) - t_endReading.tv_usec
-            );
+            long timeSign_hash = ((t_endHash.tv_sec - t_endReading.tv_sec) * 1000.0) + ((t_endHash.tv_usec - t_endReading.tv_usec)/1000.0) ;
+	        std::cout << std::setw(28) << std::left << "Hash fingerprint (sign)";
+    	    std::cout << std::setw(5) << std::right << timeSign_hash << std::endl;
             
             AutoSeededRandomPool rng;
             DSA::PrivateKey PrivateKey;
@@ -239,14 +249,13 @@ int scoped_main(int argc, char *argv[]) {
             StringSource ssSig( signature, true, new HexEncoder( new FileSink( "signature.txt" ) ) );
 
             gettimeofday(&t_end, NULL);
-            printf("Creating Signature: %ld microseconds\n",
-                   ((t_end.tv_sec - t_endKeyRead.tv_sec) * 1000000L
-                    + t_end.tv_usec) - t_endKeyRead.tv_usec
-            );
-            printf("Total time: %ld microseconds\n",
-                   ((t_end.tv_sec - t_start.tv_sec) * 1000000L
-                    + t_end.tv_usec) - t_start.tv_usec
-            );
+            long timeSign_createSignature = ((t_end.tv_sec - t_endKeyRead.tv_sec) * 1000.0) + ((t_end.tv_usec - t_endKeyRead.tv_usec)/1000.0) ;
+	        std::cout << std::setw(28) << std::left << "Sign fingerprint";
+    	    std::cout << std::setw(5) << std::right << timeSign_createSignature << std::endl;
+
+            long timeSign_total = ((t_end.tv_sec - t_start.tv_sec) * 1000.0) + ((t_end.tv_usec - t_start.tv_usec)/1000.0) ;
+	        std::cout << std::setw(28) << std::left << "Total (sign)";
+    	    std::cout << std::setw(5) << std::right << timeSign_total << std::endl;
         } 
         
         else if (command == "verify")
@@ -292,26 +301,30 @@ int scoped_main(int argc, char *argv[]) {
                             new Redirector(svf)
             ); // StringSource
           
+            gettimeofday(&t_endVerification, NULL);
+            long timeVerify_readFingerprint = ((t_startHashing.tv_sec - t_startReading.tv_sec) * 1000.0) + ((t_startHashing.tv_usec - t_startReading.tv_usec)/1000.0);
+	        std::cout << std::setw(28) << std::left << "Read fingerprint (verify)";
+    	    std::cout << std::setw(5) << std::right << timeVerify_readFingerprint << std::endl;
+
+            long timeVerify_hash = ((t_endHashing.tv_sec - t_startHashing.tv_sec) * 1000.0) + ((t_endHashing.tv_usec - t_startHashing.tv_usec)/1000.0);             
+	        std::cout << std::setw(28) << std::left << "Hash fingerprint (verify)";
+    	    std::cout << std::setw(5) << std::right << timeVerify_hash << std::endl;
+
+            long timeVerify_sign = ((t_endVerification.tv_sec - t_startVerification.tv_sec) * 1000.0) + ((t_endVerification.tv_usec - t_startVerification.tv_usec)/1000.0);
+	        std::cout << std::setw(28) << std::left << "Verify Signature";
+    	    std::cout << std::setw(5) << std::right << timeVerify_sign << std::endl;
+
+            long timeVerify_total = ((t_endVerification.tv_sec - t_startReading.tv_sec) * 1000.0) + ((t_endVerification.tv_usec - t_startReading.tv_usec)/1000.0);             
+	        std::cout << std::setw(28) << std::left << "Total (verify)";
+    	    std::cout << std::setw(5) << std::right << timeVerify_total << std::endl;
+
             if (true == svf.GetLastResult()) {
-                std::cout << "Verified signature on message" << std::endl;
+                std::cout << "\nSuccessfully verified fingerprint signature!!" << std::endl;
             }
             else {
-                std::cout << "Failed to verify signature on message" << std::endl;
+                std::cout << "Error: Failed to verify fingerprint signature!" << std::endl;
                 return 0;
             }
-            gettimeofday(&t_endVerification, NULL);
-            printf("Verifying Signature: %ld microseconds\n",
-                   ((t_endVerification.tv_sec - t_startVerification.tv_sec) * 1000000L
-                    + t_endVerification.tv_usec) - t_startVerification.tv_usec
-            );
-            printf("Reading data: %ld microseconds\n",
-                   ((t_startHashing.tv_sec - t_startReading.tv_sec) * 1000000L
-                    + t_startHashing.tv_usec) - t_startReading.tv_usec
-            );
-            printf("Hashing data: %ld microseconds\n",
-                   ((t_endHashing.tv_sec - t_startHashing.tv_sec) * 1000000L
-                    + t_endHashing.tv_usec) - t_startHashing.tv_usec
-            );             
         }
 
         else
