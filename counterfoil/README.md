@@ -1,5 +1,6 @@
 
 This repository contains the code and images for the USENIX Security 2020 paper "COUNTERFOIL: Verifying Provenance of Integrated Circuits using Intrinsic Package Fingerprints and Inexpensive Cameras" by Siva Nishok Dhanuskodi, Xiang Li and Daniel Holcomb
+The paper, talk, and bibtex entry can be found at: https://www.usenix.org/conference/usenixsecurity20/presentation/dhanuskodi
 
 There are separate programs to run the required digital signature functions and image processing functions. Used together these programs accomplish all of the tasks needed to enroll and sign fingerprints, and to verify fingerprints.
 
