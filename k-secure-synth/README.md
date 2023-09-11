@@ -13,9 +13,12 @@ Algorithm 2 performs isomorphic clustering on the technology mapped netlist obta
 If you use our work in a scientific publication, we would appreciate using the following citation:
 
 ```
-@INPROCEEDINGS{secure-synth,
-	author={Suresh, Arjun and Dhanuskodi, Siva Nishok and Holcomb, Daniel},
-	title={A Secure Design Methodology to Prevent Targeted Trojan Insertion during Fabrication},
-	year={2023}
+@INPROCEEDINGS{k-secure-synth,
+  author={Suresh, Arjun and Dhanuskodi, Siva Nishok and Holcomb, Daniel},
+  booktitle={2023 IEEE Computer Society Annual Symposium on VLSI (ISVLSI)}, 
+  title={A Secure Design Methodology to Prevent Targeted Trojan Insertion during Fabrication}, 
+  year={2023},
+  pages={1-6},
+  doi={10.1109/ISVLSI59464.2023.10238490}
 }
 ```
